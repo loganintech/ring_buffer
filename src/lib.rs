@@ -1,19 +1,54 @@
-struct Ring<T> {
+#![allow(dead_code)]
+
+/// # Ring buffer
+///
+/// Implements a ring buffer. It's not very efficient (uses a standard lib vector as the backend)
+/// This only allocates once. At this time you cannot extend the length of the buffer.
+///
+/// ```
+/// # use ring::Ring;
+///
+/// fn round_trip() {
+///     let len = 16; // Must be a multiple of 2.
+///     let mut ring: Ring<usize> = Ring::with_size(len).unwrap();
+///
+///     for i in 0..len {
+///         // Returns None if the push is successful
+///         assert_eq!(None, ring.push(i));
+///     }
+///
+///     // Returns the item you tried to push if the buffer is full
+///     assert_eq!(Some(3), ring.push(3));
+///
+///     // Empty the buffer.
+///     for i in 0..len {
+///         assert_eq!(Some(i), ring.read());
+///     }
+///     assert_eq!(None, ring.read());
+///     assert_eq!(None, ring.push(len));
+///     assert_eq!(Some(len), ring.read());
+/// }
+/// ```
+pub struct Ring<T> {
     buffer: Vec<Option<T>>,
     write: usize,
     read: usize,
 }
 
 impl<T: Clone> Ring<T> {
-    fn with_size(len: usize) -> Self {
-        Self {
+    pub fn with_size(len: usize) -> Option<Self> {
+        if std::usize::MAX % len == 0 {
+            return None;
+        }
+
+        Some(Self {
             buffer: vec![None; len],
             write: 0,
             read: 0,
-        }
+        })
     }
 
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         if self.write < self.read {
             (std::usize::MAX - (self.read.wrapping_sub(1))) + self.write
         } else {
@@ -21,9 +56,12 @@ impl<T: Clone> Ring<T> {
         }
     }
 
-    fn push(&mut self, item: T) -> Option<T> {
+    pub fn push(&mut self, item: T) -> Option<T> {
         let buffer_len = self.buffer.len();
         if self.len() < buffer_len {
+            if self.buffer[self.write % buffer_len].is_some() {
+                self.write = self.write.wrapping_add(1);
+            }
             self.buffer[self.write % buffer_len] = Some(item);
             self.write = self.write.wrapping_add(1);
             return None;
@@ -31,8 +69,8 @@ impl<T: Clone> Ring<T> {
         Some(item)
     }
 
-    fn read(&mut self) -> Option<T> {
-        if self.len() == 0 {
+    pub fn read(&mut self) -> Option<T> {
+        if self.is_empty() {
             return None;
         }
 
@@ -43,35 +81,20 @@ impl<T: Clone> Ring<T> {
         }
         res
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn round_trip() {
-        let len = 10;
-        let mut ring: Ring<usize> = Ring::with_size(len);
-
-        for i in 0..len {
-            assert_eq!(None, ring.push(i));
-        }
-
-        assert_eq!(Some(3), ring.push(3));
-
-        for i in 0..len {
-            assert_eq!(Some(i), ring.read());
-        }
-        assert_eq!(None, ring.read());
-        assert_eq!(None, ring.push(len));
-        assert_eq!(Some(len), ring.read());
-    }
+mod test {
+    use super::Ring;
 
     #[test]
     fn wrap_at_end() {
         let mut ring: Ring<usize> = Ring {
-            buffer: vec![None; 3],
+            buffer: vec![None; 10],
             write: std::usize::MAX,
             read: std::usize::MAX,
         };
@@ -82,5 +105,9 @@ mod tests {
         assert_eq!(2, ring.len());
         ring.push(1);
         assert_eq!(3, ring.len());
+        assert_eq!(Some(std::usize::MAX), ring.read());
+        assert_eq!(Some(0), ring.read());
+        assert_eq!(Some(1), ring.read());
     }
+
 }
