@@ -1,13 +1,10 @@
-use std::fmt::Debug;
-
-#[derive(Debug)]
-struct Ring<T: Debug> {
+struct Ring<T> {
     buffer: Vec<Option<T>>,
     write: usize,
     read: usize,
 }
 
-impl<T: Clone + Debug> Ring<T> {
+impl<T: Clone> Ring<T> {
     fn with_size(len: usize) -> Self {
         Self {
             buffer: vec![None; len],
