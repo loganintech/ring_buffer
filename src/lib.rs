@@ -29,15 +29,17 @@
 ///     assert_eq!(Some(len), ring.read());
 /// }
 /// ```
+
+#[derive(Debug)]
 pub struct Ring<T> {
     buffer: Vec<Option<T>>,
     write: usize,
     read: usize,
 }
 
-impl<T: Clone> Ring<T> {
+impl<T: Clone + std::fmt::Debug> Ring<T> {
     pub fn with_size(len: usize) -> Option<Self> {
-        if std::usize::MAX % len == 0 {
+        if len % 4 == 0 {
             return None;
         }
 
@@ -94,16 +96,19 @@ mod test {
     #[test]
     fn wrap_at_end() {
         let mut ring: Ring<usize> = Ring {
-            buffer: vec![None; 10],
+            buffer: vec![None; 4],
             write: std::usize::MAX,
             read: std::usize::MAX,
         };
         assert_eq!(0, ring.len());
         ring.push(std::usize::MAX);
+        println!("{:?}", ring);
         assert_eq!(1, ring.len());
         ring.push(0);
+        println!("{:?}", ring);
         assert_eq!(2, ring.len());
         ring.push(1);
+        println!("{:?}", ring);
         assert_eq!(3, ring.len());
         assert_eq!(Some(std::usize::MAX), ring.read());
         assert_eq!(Some(0), ring.read());
